@@ -11,8 +11,8 @@
 typedef struct RM_ScanHandle
 {
   RM_TableData *rel;
-  int currentPage;
-  int currentSlot;
+  int curPage;
+  int curSlot;
   Expr *expr;
   void *mgmtData;
 } RM_ScanHandle;

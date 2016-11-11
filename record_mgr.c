@@ -35,7 +35,6 @@ size_t sizefloat = sizeof(float );
 
 RC initRecordManager (void *mgmtData) {
    
-    
     // xpy
 //    RC flag  =-99;
 //    
@@ -164,10 +163,10 @@ RC createTable (char *name, Schema *schema) {
     ensureCapacity(file_meta_data_size, &filehandle);
     
         // transfer data into input_infor and write into block
-    memcpy(input_infor, &file_meta_data_size, sizeint);
-    memcpy(input_infor + sizeint, &record_size, sizeint);
-    memcpy(input_infor + (2 * sizeint), &slot_size, sizeint);
-    memcpy(input_infor + (3 * sizeint), &record_num, sizeint);
+    memmove(input_infor, &file_meta_data_size, sizeint);
+    memmove(input_infor + sizeint, &record_size, sizeint);
+    memmove(input_infor + (2 * sizeint), &slot_size, sizeint);
+    memmove(input_infor + (3 * sizeint), &record_num, sizeint);
     
         // get schema infor and input into the
         //** file_meta_data_tr and extra_size is make easy to read
@@ -263,12 +262,16 @@ RC openTable (RM_TableData *rel, char *name) {
     
         // flag for input:
         char *flag;
-        char *trans = (char *) calloc(40, sizechar); // temp transfor data;
+    
+    // trans: 40 sizeof char
+        char *trans = (char *) calloc(20, sizechar); // temp transfor data;
     
     
         // init buffer pool
         openPageFile(name, filehandle);
-        initBufferPool(bufferpool, name, 10, RS_LRU, NULL);
+    
+    //  pagenum change to 20 rather than 10
+        initBufferPool(bufferpool, name, 20, RS_LRU, NULL);
 //        file_meta_data_size = File_Meta_Data_Size(bufferpool);
     file_meta_data_size = File_Meta_Data_Size(bufferpool);
     
@@ -309,15 +312,18 @@ RC openTable (RM_TableData *rel, char *name) {
         flag = strchr(flag, '(');
         flag++;
     
-        int j,k;
+    int j;  // change for the 1st loop
+    int k;
     
-        for(i=0; i< numAttr_cr; ++i){
-            for (j=0;;++j){
+    
+    //fucn2 : exange
+        for(i=0; i< numAttr_cr; i++){
+            for (j=0;;j++){
+//            while (j++){
     
                 if ( *(flag + j) == ':'){
                     attrNames_cr[i] = (char *) malloc (j * sizechar);
                     memcpy(attrNames_cr[i], flag, j);
-    
                     switch ( *(flag + j + 2)) {
                         case 'I':
                             dataTypes_cr[i] = DT_INT;
@@ -359,62 +365,86 @@ RC openTable (RM_TableData *rel, char *name) {
                 }
             }
         }
+
+    
+//    get_Type_Length(numAttr_cr, dataTypes_cr, attrNames_cr, flag, typeLength_cr);
     
         flag = strchr(flag,'(');
         flag ++;
+    // func 2, done
     
-        char * flag2;
-        flag2 = flag;
     
-        for (i= 0;;i++){
-            flag2 = strchr(flag2, ',');
+    char * flag2;
+    flag2 = flag;
     
-            if (flag2 == NULL){
-                break;
-            }
+    // func3: exange
     
-            flag2++;
-        }
+//        for (i= 0;;i++){  // change to while
+//    i=0;
+//    while (1){
+//        flag2 = strchr(flag2, ',');
+//        if (flag2 == NULL){
+//            break;
+//        }
+//    
+//        flag2++;
+//        i++;
+//    }
+    // func3:
+    getkeysize(flag2, keyAttrs_cr);
+
+    keyAttrs_cr = (int *) malloc(keysize_cr * sizeint);
     
-        keysize_cr = i+1; // i
-        keyAttrs_cr = (int *) malloc(keysize_cr * sizeint);
+    // func 4: exchagnge
+    // delete 4: begin:
+//    j = 0; //  while(1)  , but cannot pass the testfile
+//    for (i =0; i< keysize_cr;i++){
+////          for (j=0;;j++){
+////         fuck , why?  why ? why my inin j= 0 cannot run the testfile
+//        while(1){
+//            if ((*(flag + j) == ',') || (*(flag + j) == ')')) {
+//                trans = (char *)malloc(100 * sizechar);
+//                memmove(trans, flag, j);
+//                for (k = 0; k < numAttr_cr; k++) {
+//    
+//                    if (strcmp(trans,attrNames_cr[k]) == 0) {
+//                        keyAttrs_cr[i] = k; // assign keyAttrs
+//                        free(trans);
+//                        break;
+//                    }
+//                }
+//                if (*(flag + j) == ',') {
+//                    flag = flag + j + 2;
+//                }
+//                else {
+//                    flag = flag + j;
+//                }
+//                break;
+//            }
+////            j++;  // add to while
+//        }
+////        j++; // change to while
+//        
+//    }
+    // delete4 done
     
-        for (i =0; i< keysize_cr;++i){
-            for (j=0;;++j){
-                if ((*(flag + j) == ',') || (*(flag + j) == ')')) {
-                    trans = (char *)malloc(100 * sizechar);
-                    memcpy(trans, flag, j);
-                    for (k = 0; k < numAttr_cr; k++) {
+    // func4:
+    getKeyAttr(keysize_cr, flag, attrNames_cr, keyAttrs_cr);
     
-                        if (strcmp(trans,attrNames_cr[k]) == 0) {
-                            keyAttrs_cr[i] = k; // assign keyAttrs
-                            free(trans);
-                            break;
-                        }
-                    }
-                    if (*(flag + j) == ',') {
-                        flag = flag + j + 2;
-                    }
-                    else {
-                        flag = flag + j;
-                    }
-                    break;
-                }
-                
-            }
-        }
+    scheam_cr = createSchema(numAttr_cr, attrNames_cr, dataTypes_cr, typeLength_cr, keysize_cr, keyAttrs_cr);
+    
+    rel->name = name;
+    
+    rel->bm = bufferpool;
+    
+    rel->fh = filehandle;
+    
+    rel->schema = scheam_cr;
         
-        scheam_cr = createSchema(numAttr_cr, attrNames_cr, dataTypes_cr, typeLength_cr, keysize_cr, keyAttrs_cr);
-        
-        rel->name = name;
-        rel->bm = bufferpool;
-        rel->fh = filehandle;
-        rel->schema = scheam_cr;
-        
-        //    free(pagehandle);
+    //    free(pagehandle);
         
         
-        return RC_OK;
+    return RC_OK;
 
 }
 
@@ -539,71 +569,190 @@ int getNumTuples (RM_TableData *rel) {
  *
 ***************************************************************/
 RC insertRecord (RM_TableData *rel, Record *record) {
-    BM_PageHandle *h = MAKE_PAGE_HANDLE();
-    int r_size = getRecordSize(rel->schema);
-    int p_mata_index = File_Meta_Data_Size(rel->bm);
-    int r_slotnum = (r_size + sizeof(bool)) / 256 + 1;
+//    BM_PageHandle *pagehandle = MAKE_PAGE_HANDLE();
+//    int recordSize = getRecordSize(rel->schema);   //r_size
+//    int pageMetadataIndx = File_Meta_Data_Size(rel->bm);   // pageMetadataIndx
+//    int slotnum = ((recordSize + sizebool) / 256) + 1;  // r_slotnum
+//    int offset = 0;
+//    int recordCurNum, numTuples; // recordCurNum
+//    bool statement = true;  //r_stat
+//    bool check = true;
+//
+//    // Find out the target page and slot at the end.
+////    do {｝ while (1)
+//    // func1: find target page:
+//    // para: rel->bm, h->data, pageMetadatIndx,
+//    findTargetPage(rel->bm, pagehandle, pageMetadataIndx);
+//
+//    // Find out the target meta index and record number of the page.
+//    // func2: find record index
+//    // para: pagehandle, offset(int), recordcurNum, rel->filehandle, rel->bm)
+//    do {
+//        memmove(&recordCurNum, pagehandle->data + offset + sizeof(int), sizeof(int));
+//        offset += 2*sizeof(int);
+//    } while (recordCurNum == PAGE_SIZE / 256);
+//
+////     If no page exist, add new page.
+//    if(recordCurNum == -1){
+//        // If page mata is full, add new matadata block.
+//        if(offset == PAGE_SIZE){       
+//            memcpy(pagehandle->data + PAGE_SIZE - sizeof(int), &rel->fh->totalNumPages, sizeof(int));   // Link into new meta data page. 
+//            addPageMetadataBlock(rel->fh);
+//            markDirty(rel->bm, pagehandle);
+//            unpinPage(rel->bm, pagehandle);      // Unpin the last meta page.
+//            pinPage(rel->bm, pagehandle, rel->fh->totalNumPages-1);  // Pin the new page.
+//            offset = 2*sizeof(int);
+//        }
+//        
+//        if(check){
+//            memmove(pagehandle->data + offset - 2*sizeof(int), &rel->fh->totalNumPages, sizeof(int));  // set page number.
+//            
+//            appendEmptyBlock(rel->fh);
+//            recordCurNum = 0;
+//        }
+//        
+//    }
+////     func 2: done
+////    findRecordIndex(rel, pagehandle, offset, recordCurNum);
+////    findRecordIndex(rel->bm, rel->fh, pagehandle, offset, recordCurNum);
+//
+//    // Read record->id and set record number add 1 in meta data.
+//    memmove(&record->id.page, pagehandle->data + offset - 2*sizeint, sizeint);   // Set record->id page number.
+//    record->id.slot = recordCurNum * slotnum;                                // Set record->id slot.
+//    recordCurNum++;                                
+//    memmove(pagehandle->data + offset - sizeof(int), &recordCurNum, sizeof(int));   // Set record number++ into meta data.
+//    
+//    if(markDirty(rel->bm, pagehandle)){
+//        unpinPage(rel->bm, pagehandle);
+//    }              // unpin meta page.
+//
+//    // Insert record header and record data into page.
+//    pinPage(rel->bm, pagehandle, record->id.page);
+//    memmove(pagehandle->data + 256*record->id.slot, &statement, sizeof(bool));   // Record header is a del_flag
+//    memmove(pagehandle->data + 256*record->id.slot + sizeof(bool), record->data, recordSize); // Record body is values.
+//    markDirty(rel->bm, pagehandle);
+//    unpinPage(rel->bm, pagehandle);
+//    
+//    // Tuple number add 1.
+//    // func 3: updata tuple infor
+//    pinPage(rel->bm, pagehandle, 0);
+//    memcpy(&numTuples, pagehandle->data + 3 * sizeof(int), sizeof(int));
+//    numTuples++;
+//    memcpy(pagehandle->data + 3 * sizeof(int), &numTuples, sizeof(int));
+//    markDirty(rel->bm, pagehandle);
+//    unpinPage(rel->bm, pagehandle);
+//    
+////
+//    
+////    updateTumpleInfor(rel->bm, pagehandle, numTuples);
+//     // func3 done
+//    
+//    free(pagehandle);
+//    return RC_OK;
+    
+    //    BM_PageHandle *pagehandle = MAKE_PAGE_HANDLE();
+    //    int recordSize = getRecordSize(rel->schema);   //r_size
+    //    int pageMetadataIndx = File_Meta_Data_Size(rel->bm);   // pageMetadataIndx
+    //    int slotnum = ((recordSize + sizebool) / 256) + 1;  // r_slotnum
+    //    int offset = 0;
+    //    int recordCurNum, numTuples; // recordCurNum
+    //    bool statement = true;  //r_stat
+    //    bool check = true;
+    
+    BM_PageHandle *pagehandle = MAKE_PAGE_HANDLE();
+    int recordsize = getRecordSize(rel->schema);
+    int pageMetadataIndx = File_Meta_Data_Size(rel->bm);
+    int slotnum = (recordsize + sizeof(bool)) / 256 + 1;
     int offset = 0;
-    int r_current_num, numTuples;
-    bool r_stat = true;
-       
+    int recordCurNum, numTuples;
+    bool statement = true;
+    bool check = true;
+    
     // Find out the target page and slot at the end.
-    do {
-        pinPage(rel->bm, h, p_mata_index);
-        memcpy(&p_mata_index, h->data + PAGE_SIZE - sizeof(int), sizeof(int));
-        if(p_mata_index != -1){
-            unpinPage(rel->bm, h);
-        } else {
-            break;
-        }
-    } while(true);
-
+    //func1:
+//    do {
+//        pinPage(rel->bm, pagehandle, pageMetadataIndx);
+//        memcpy(&pageMetadataIndx, pagehandle->data + PAGE_SIZE - sizeof(int), sizeof(int));
+//        if(pageMetadataIndx != -1){
+//            unpinPage(rel->bm, pagehandle);
+//        } else {
+//            break;
+//        }
+//    } while(true);
+    
+    findTargetPage(rel->bm, pagehandle, pageMetadataIndx);
+    //func1 done:
+    
+    
+    
     // Find out the target meta index and record number of the page.
+    //func 2
+    //
     do {
-        memcpy(&r_current_num, h->data + offset + sizeof(int), sizeof(int));
+        memcpy(&recordCurNum, pagehandle->data + offset + sizeof(int), sizeof(int));
         offset += 2*sizeof(int);
-    } while (r_current_num == PAGE_SIZE / 256);
-
+    } while (recordCurNum == PAGE_SIZE / 256);
+    
     // If no page exist, add new page.
-    if(r_current_num == -1){       
+    if(recordCurNum == -1){
         // If page mata is full, add new matadata block.
-        if(offset == PAGE_SIZE){       
-            memcpy(h->data + PAGE_SIZE - sizeof(int), &rel->fh->totalNumPages, sizeof(int));   // Link into new meta data page. 
+        if(offset == PAGE_SIZE){
+            memcpy(pagehandle->data + PAGE_SIZE - sizeof(int), &rel->fh->totalNumPages, sizeof(int));   // Link into new meta data page.
             addPageMetadataBlock(rel->fh);
-            markDirty(rel->bm, h);
-            unpinPage(rel->bm, h);      // Unpin the last meta page.
-            pinPage(rel->bm, h, rel->fh->totalNumPages-1);  // Pin the new page.
+            markDirty(rel->bm, pagehandle);
+            unpinPage(rel->bm, pagehandle);      // Unpin the last meta page.
+            pinPage(rel->bm, pagehandle, rel->fh->totalNumPages-1);  // Pin the new page.
             offset = 2*sizeof(int);
         }
-        memcpy(h->data + offset - 2*sizeof(int), &rel->fh->totalNumPages, sizeof(int));  // set page number.
+        memcpy(pagehandle->data + offset - 2*sizeof(int), &rel->fh->totalNumPages, sizeof(int));  // set page number.
         appendEmptyBlock(rel->fh);
-        r_current_num = 0;                                  
-    } 
-
+        recordCurNum = 0;
+    }
+    
+    
+//    findRecordIndex(rel, pagehandle, offset, recordCurNum);
+    // func 2 done:
+    
+    // func4
     // Read record->id and set record number add 1 in meta data.
-    memcpy(&record->id.page, h->data + offset - 2*sizeof(int), sizeof(int));   // Set record->id page number.
-    record->id.slot = r_current_num * r_slotnum;                                // Set record->id slot.
-    r_current_num++;                                
-    memcpy(h->data + offset - sizeof(int), &r_current_num, sizeof(int));   // Set record number++ into meta data.
-    markDirty(rel->bm, h);
-    unpinPage(rel->bm, h);              // unpin meta page.
-
-    // Insert record header and record data into page.
-    pinPage(rel->bm, h, record->id.page);
-    memcpy(h->data + 256*record->id.slot, &r_stat, sizeof(bool));   // Record header is a del_flag 
-    memcpy(h->data + 256*record->id.slot + sizeof(bool), record->data, r_size); // Record body is values.
-    markDirty(rel->bm, h);
-    unpinPage(rel->bm, h);
+    
+//    memcpy(&record->id.page, pagehandle->data + offset - 2*sizeof(int), sizeof(int));   // Set record->id page number.
+//    record->id.slot = recordCurNum * slotnum;                                // Set record->id slot.
+//    recordCurNum++;
+//    memcpy(pagehandle->data + offset - sizeof(int), &recordCurNum, sizeof(int));   // Set record number++ into meta data.
+//    markDirty(rel->bm, pagehandle);
+//    unpinPage(rel->bm, pagehandle);              // unpin meta page.
+//    
+//    // Insert record header and record data into page.
+//    pinPage(rel->bm, pagehandle, record->id.page);
+//    memcpy(pagehandle->data + 256*record->id.slot, &statement, sizeof(bool));   // Record header is a del_flag
+//    memcpy(pagehandle->data + 256*record->id.slot + sizeof(bool), record->data, recordsize); // Record body is values.
+//    markDirty(rel->bm, pagehandle);
+//    unpinPage(rel->bm, pagehandle);
+    
+//    readRecord(RM_TableData *rel, BM_PageHandle *pagehandle ,Record *record, int slotnum, int offset, int recordCurNum , int recordsize)
+    readRecord(rel, pagehandle, record, slotnum, offset, recordCurNum, recordsize);
+    
+    // func4 done
+    
+    
     // Tuple number add 1.
-    pinPage(rel->bm, h, 0);
-    memcpy(&numTuples, h->data + 3 * sizeof(int), sizeof(int));
-    numTuples++;       
-    memcpy(h->data + 3 * sizeof(int), &numTuples, sizeof(int));
-    markDirty(rel->bm, h);
-    unpinPage(rel->bm, h);
-
-    free(h);
+    //func3
+//    pinPage(rel->bm, pagehandle, 0);
+//    memcpy(&numTuples, pagehandle->data + 3 * sizeof(int), sizeof(int));
+//    numTuples++;
+//    memcpy(pagehandle->data + 3 * sizeof(int), &numTuples, sizeof(int));
+//    markDirty(rel->bm, pagehandle);
+//    unpinPage(rel->bm, pagehandle);
+//
+    
+//    updateTumpleInfor(rel, pagehandle, numTuples);
+    updateTumpleInfor(rel, pagehandle, numTuples);
+    //func3 done:
+    free(pagehandle);
+    
     return RC_OK;
+
 }
 
 /***************************************************************
@@ -839,9 +988,13 @@ RC startScan (RM_TableData *rel, RM_ScanHandle *scan, Expr *cond)
     }
     
     scan->rel=rel;
-    scan->currentPage=0;
-    scan->currentSlot=0;
+    
+    scan->curPage=0;
+    
+    scan->curSlot=0;
+    
     scan->expr=cond;
+    
     scan->mgmtData = NULL;
     
     return RC_OK;
@@ -882,14 +1035,14 @@ RC next (RM_ScanHandle *scan, Record *record)
     
     pinPage(tmpbm,ph,index);
 
-    while(scan->currentPage!=index)
+    while(scan->curPage!=index)
     {
-        memcpy(&rpage,ph->data+(scan->currentPage)*2*sizeof(int),sizeof(int));
-        memcpy(&maxslot, ph->data + ((scan->currentPage) *2+1)* sizeof(int), sizeof(int));
+        memcpy(&rpage,ph->data+(scan->curPage)*2*sizeof(int),sizeof(int));
+        memcpy(&maxslot, ph->data + ((scan->curPage) *2+1)* sizeof(int), sizeof(int));
         int i;
         if(maxslot!=-1)
         {
-            for(i=scan->currentSlot;i<maxslot;i++)
+            for(i=scan->curSlot;i<maxslot;i++)
             {
                 rid.page=rpage;
                 rid.slot=i*trs;
@@ -903,11 +1056,11 @@ RC next (RM_ScanHandle *scan, Record *record)
                         record->data=tmp->data;
                         if(i==maxslot-1)
                         {
-                            scan->currentPage++;
-                            scan->currentSlot=0;
+                            scan->curPage++;
+                            scan->curSlot=0;
                         }
                         else{
-                            scan->currentSlot=i+1;
+                            scan->curSlot=i+1;
                         }
                         free(result);
                         free(tmp);
@@ -924,12 +1077,102 @@ RC next (RM_ScanHandle *scan, Record *record)
             free(ph);
             return RC_RM_NO_MORE_TUPLES;
         }
-        scan->currentPage++;
+        scan->curPage++;
     }
     unpinPage (tmpbm, ph);
     free(ph);
     return RC_RM_NO_MORE_TUPLES;
 }
+
+    //xpy:
+//    RC flag = -99;
+//    
+//    BM_BufferPool *bufferpool; // tmpbm;
+//    bufferpool = scan->rel->bm;
+//    
+//    int index,maxslot;
+//    int rpage;// rapge = ridpage
+//    int recordsize; //trs
+//    
+//    BM_PageHandle * bmPageHandle;
+//    Record *recordp;  //tmp
+//    Value *value;  //result
+//    
+//    bmPageHandle = (BM_PageHandle *)malloc(sizeof(BM_PageHandle));
+//    recordp = (Record*)malloc (sizeof(Record));
+//    value= (Value *)malloc (sizeof(Value));
+//    
+//    RID rid;
+//    
+//    
+//    recordsize = ((getRecordSize(scan->rel->schema) + sizeof(bool))/ SLOT_SIZE) + 1;
+//    index = File_Meta_Data_Size(bufferpool);
+//
+//    pinPage(bufferpool, bmPageHandle, index);
+//    
+//    if (scan->curPage < 0){
+//        printf("wrong scan curpage, in next()\n");
+//    }
+//    
+////        for (; scan->curPage<=index; scan->curPage++){
+//    while (scan->curPage != index){
+//        memmove(&rpage, bmPageHandle->data + (scan->curPage) * 2 * sizeof(int), sizeof(int));
+//        memmove(&maxslot, bmPageHandle->data + ((scan->curPage) * 2 + 1) * sizeof(int), sizeof(int));
+//    
+//        int i;
+//        if ( maxslot != 1){
+//            i = scan->curSlot;
+//            while (i < maxslot){
+////            for( ;i<maxslot;i++){
+//                rid.page = rpage;
+//                rid.slot = i * recordsize;
+//                flag = getRecord(scan->rel, rid, recordp);
+//                if (flag == RC_OK){
+//                    evalExpr(recordp, scan->rel->schema, scan->expr, &value);
+//    
+//                    if (value->v.boolV){
+//                        record->id.page = rid.page;
+//                        record->id.slot = rid.slot;
+//                        record->data = recordp->data;
+//    
+//                            // if near the end;
+//                        if (i == (maxslot -1)){
+//                            scan->curPage +=1;
+//                            scan->curSlot = 0;
+//                        }
+//                        else {
+//                            scan->curSlot +=1;
+//                        }
+//
+//                        free(value);
+//                        free(recordp);
+//                        unpinPage(bufferpool, bmPageHandle);
+//                        free(bmPageHandle);
+//                        return RC_OK;
+//                        }
+//                    }
+//
+//                else{
+//                    return RC_FILE_NOT_FOUND;
+//                }
+//                i++;
+//            }
+//        }
+//        else{
+//            printf("here is wrong 1 , in next()\n");
+//            unpinPage(bufferpool, bmPageHandle);
+//            free(bmPageHandle);
+//            return RC_FILE_NOT_FOUND;
+//        }
+//        scan->curPage++;
+//    }
+//
+//
+//    printf("unknow error, in next()");
+//    unpinPage(bufferpool, bmPageHandle);
+//    free(bmPageHandle);
+//    return RC_FILE_NOT_FOUND;
+//}
 
 /***************************************************************
  * Function Name: closeScan
@@ -1559,8 +1802,268 @@ int getTotalRecords_slot( RM_TableData *rel){
  * Return: int
  *
  ***************************************************************/
-int modifyFileMetaPage (RM_TableData *rel, char *name)
-{
+
+
+//func3:
+int getkeysize(char *input, int keysize){
     
+    int i =0;
+    
+    while(1){
+        input = strchr(input, ',');
+        if (input == NULL){
+            break;
+        }
+        input++;
+        i++;
+    }
+    i++;
+    
+    keysize = i;
+    return RC_OK;
+}
+
+//func3 done
+
+// func 4:
+int getKeyAttr( int key_size , char * input, char **attrNames, char *keyAttrs)
+{
+    int i =0;
+    int j =0;
+    int k =0;
+    char *trans = (char *)malloc(100 * sizechar);
+    
+    RC rc = -99;
+    if (key_size <= 0){
+        printf("in put key_size error ---- getKeyAttr()\n");
+        return rc;
+    }
+    
+    for  (; i<key_size ; i++){
+        // while
+        for (;;j++){
+            if ((*(input + j) == ',') || (*(input + j) == ')')) {
+                
+                memmove(trans, input, j);
+                for (k = 0; k < key_size; k++) {
+                    
+                    if (strcmp(trans,attrNames[k]) == 0) {
+                        keyAttrs[i] = k; // assign keyAttrs
+                        free(trans);
+                        break;
+                    }
+                }
+                if (*(input + j) == ',') {
+                    input = input + j + 2;
+                }
+                else {
+                    input = input + j;
+                }
+                break;
+            }
+        }
+    }
+    return RC_OK;
+}
+//func 4 done:
+
+//Schema *scheam_cr;
+//int numAttr_cr;
+//char ** attrNames_cr;
+//DataType *dataTypes_cr;
+//int *typeLength_cr;
+//int *keyAttrs_cr;
+//int keysize_cr;
+
+// func 2:
+int get_Type_Length (int numAttr, DataType *dataTypes, char **attrNames, char *input, int *typeLength)
+{
+    RC rc = -99;
+    if (numAttr < 0 || dataTypes == NULL){
+        printf("input error, -----getTypeLength\n");
+        return rc;
+    }
+    
+    int i = 0;
+    int j = 0;
+    int k;
+
+    while (i< numAttr){
+//        for(j=0;;j++){
+        while (1){
+//            if ( *(input + j) == ':'){
+            if ( *(input + j) == ':'){
+                attrNames[i] = (char *) malloc (j * sizechar);
+                memmove(attrNames[i], input, j);  //change to memove
+                switch ( *(input + j + 2)) {
+                    case 'I':
+                        dataTypes[i] = DT_INT;
+                        typeLength[i] = 0;
+                        break;
+                    case 'B':
+                        dataTypes[i] = DT_BOOL;
+                        typeLength[i] = 0;
+                        break;
+                    case 'F':
+                        dataTypes[i] = DT_FLOAT;
+                        typeLength[i] = 0;
+                        break;
+                    case 'S':
+                        dataTypes[i]= DT_STRING;
+
+                        char *temp = (char *) malloc (40 * sizechar);
+                        
+                        for (k=0;;k++){
+                        // not consider;
+                            if ( *(input + k + 9) == ']'){ // ?
+                                break;
+                            }
+                            temp[k] = input [k +j + 9]; //?
+                        }
+                    
+                        typeLength[i] = atoi(temp);
+                        free(temp);
+                        break;
+                }
+                if ( i == numAttr -1){
+                    break;
+                }
+            
+                input = strchr(input, ',');
+                input += 2;
+                break;
+            }
+            j++;
+        }
+    }
+    return RC_OK;
+}
+
+
+// insert record func:
+// func1: find target page:
+// para: rel->bm, h->data, pageMetadatIndx,
+// return
+int findTargetPage(BM_BufferPool *bufferpool, BM_PageHandle *pageHandle, int Index){
+    RC rc  = -99;
+    
+    if (Index < 0 || bufferpool == NULL || pageHandle == NULL){
+        printf("input error, ------findTargetPage\n");
+        return rc;
+    }
+    
+    while(1){
+        pinPage(bufferpool, pageHandle, Index);
+
+        memmove(&Index, pageHandle->data + PAGE_SIZE - sizeint, sizeint);
+
+        if (Index != -1){
+            unpinPage(bufferpool, pageHandle);
+        }
+        else {
+            break;
+        }
+    }
+    
+    return RC_OK;
+}
+
+// Find out the target meta index and record number of the page.
+// func2: find index
+// para: pagehandle, offset(int), recordcurNum, rel->filehandle, rel->bm)
+int findRecordIndex(RM_TableData *rel, BM_PageHandle *pagehandle, int offset, int curNum)
+{
+    RC rc = -99;
+    
+    if (rel == NULL || curNum < 0 ){
+        printf("input error\n");
+        return rc;
+    }
+    
+    //replace:
+      do {
+            memmove(&curNum, pagehandle->data + offset + sizeof(int), sizeof(int));
+            offset += 2*sizeof(int);
+        } while (curNum == PAGE_SIZE / 256);
+    
+    //     If no page exist, add new page.
+        if(curNum == -1){
+            // If page mata is full, add new matadata block.
+            if(offset == PAGE_SIZE){
+                memcpy(pagehandle->data + PAGE_SIZE - sizeof(int), &rel->fh->totalNumPages, sizeof(int));   // Link into new meta data page.
+                addPageMetadataBlock(rel->fh);
+                markDirty(rel->bm, pagehandle);
+                unpinPage(rel->bm, pagehandle);      // Unpin the last meta page.
+                rc = pinPage(rel->bm, pagehandle, rel->fh->totalNumPages-1);  // Pin the new page.
+                offset = 2*sizeof(int);
+            }
+    
+//            if(check){
+                memmove(pagehandle->data + offset - 2*sizeof(int), &rel->fh->totalNumPages, sizeof(int));  // set page number.
+    
+                appendEmptyBlock(rel->fh);
+                curNum = 0;
+//            }
+            
+        }
+    
+    return RC_OK;
+}
+
+
+// func: unpdata
+int updateTumpleInfor( RM_TableData *rel, BM_PageHandle * pagehandle, int numTumples){
+    
+//    printf("here is going to update the tumple\n");
+    
+    RC flag = -99;
+    
+    // need to update withe 3 size of int
+    int extra_size = 3 * sizeint;
+    
+    if(rel->bm == NULL || pagehandle == NULL){
+        return flag;
+    }
+    
+    flag = pinPage(rel->bm, pagehandle, 0);
+    
+    if(flag == RC_OK){
+        //    memmove(&numTumples, pagehandle->data + 3 * sizeof(int), sizeof(int));
+
+        memmove(&numTumples, pagehandle->data + extra_size, sizeint);
+        numTumples++;
+        
+        memcpy(pagehandle->data + extra_size, &numTumples, sizeint);
+        
+        markDirty(rel->bm, pagehandle);
+        
+        unpinPage(rel->bm, pagehandle);
+        
+        return RC_OK;
+    }
+    
+    return flag;
+}
+
+// func4:  // read record
+int readRecord(RM_TableData *rel, BM_PageHandle *pagehandle ,Record *record, int slotnum, int offset, int recordCurNum , int recordsize)
+{
+    // do not put in statment;
+    bool statement  = true;
+    
+    memcpy(&record->id.page, pagehandle->data + offset - 2*sizeof(int), sizeof(int));   // Set record->id page number.
+    record->id.slot = recordCurNum * slotnum;                                // Set record->id slot.
+    recordCurNum++;
+    memcpy(pagehandle->data + offset - sizeof(int), &recordCurNum, sizeof(int));   // Set record number++ into meta data.
+    markDirty(rel->bm, pagehandle);
+    unpinPage(rel->bm, pagehandle);              // unpin meta page.
+    
+    // Insert record header and record data into page.
+    pinPage(rel->bm, pagehandle, record->id.page);
+    memcpy(pagehandle->data + 256*record->id.slot, &statement, sizeof(bool));   // Record header is a del_flag
+    memcpy(pagehandle->data + 256*record->id.slot + sizeof(bool), record->data, recordsize); // Record body is values.
+    markDirty(rel->bm, pagehandle);
+    unpinPage(rel->bm, pagehandle);
+
     return RC_OK;
 }
