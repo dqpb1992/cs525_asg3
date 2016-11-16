@@ -1,8 +1,8 @@
-base = buffer_mgr.o buffer_mgr_stat.o dberror.o expr.o rm_serializer.o storage_mgr.o record_mgr.o
+base = buffer_mgr.o buffer_mgr_stat.o dberror.o rm_serializer.o storage_mgr.o record_mgr.o #expr.o
 
-test_expr : $(base) test_expr.o
-	gcc -o test_expr $(base) test_expr.o
-	rm *.o
+#test_expr : $(base) test_expr.o
+#	gcc -o test_expr $(base) test_expr.o
+#	rm *.o
 
 test : $(base) test_assign3_1.o
 	gcc -o test $(base) test_assign3_1.o
@@ -17,8 +17,8 @@ buffer_mgr_stat.o : buffer_mgr_stat.c
 dberror.o : dberror.c
 	gcc -c dberror.c -I .
 
-expr.o : expr.c
-	gcc -c expr.c -I .
+#expr.o : expr.c
+#	gcc -c expr.c -I .
 
 rm_serializer.o : rm_serializer.c
 	gcc -c rm_serializer.c -I .
